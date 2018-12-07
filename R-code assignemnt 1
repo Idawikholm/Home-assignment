@@ -1,0 +1,190 @@
+# clears workspace:
+graphics.off()
+rm(list = ls(all = TRUE))
+
+###########################
+# set the working directory
+##########################
+
+setwd("~/PSYP13 1")
+
+###########################
+#Load packages
+#########################
+
+library(lmtest)
+library(lsr)
+library(psych)
+
+library(car)
+library(ggplot2)
+library(lm.beta)
+
+source("GraphPlots.R")
+
+########################
+# load data file
+#######################
+mydata_1<- read.csv("https://raw.githubusercontent.com/kekecsz/PSYP13_Data_analysis_class-2018/master/home_sample_1.csv")
+
+#########################################
+# checking for irregularities in dataset
+#########################################
+
+View(mydata_1)
+
+describe(mydata_1)
+describe(mydata_1$age)
+table(mydata_1$sex)
+
+# Histograms
+
+hist(mydata_1$pain, breaks = 20)
+hist(mydata_1$age, breaks = 20)
+hist(mydata_1$pain_cat, breaks = 20)
+hist(mydata_1$STAI_trait, breaks = 20)
+hist(mydata_1$cortisol_serum, breaks = 10)
+hist(mydata_1$cortisol_saliva, breaks = 10)
+hist(mydata_1$mindfulness, breaks = 10)
+
+
+##############################################################################################################
+# cleaning dataset by correcting coding error in variable age, participant 28. Excluding participant 112, 148 
+##############################################################################################################
+mydata1_cleaned = mydata_1
+
+mydata1_cleaned[mydata1_cleaned[, "age"] == 222, "age"] = 22
+
+mydata1_cleaned <- mydata1_cleaned[-c(112, 146), ]
+
+# Checking again
+
+describe(mydata1_cleaned$age)
+
+openGraph()
+hist(mydata1_cleaned$age, breaks = 10)
+
+describe(mydata1_cleaned)
+
+###################################################
+#creating models
+###################################################
+model1 =lm(pain ~ sex + age, data = mydata1_cleaned)
+
+model2 = lm(pain ~ sex + age + pain_cat + STAI_trait + cortisol_serum + cortisol_saliva + mindfulness, data = mydata1_cleaned)
+
+summary(model1)
+summary(model2)
+
+##################################################
+# Model diagnostics
+##################################################
+
+#Checking for outliers - Cook's distance
+
+4/nrow(mydata_1) 
+openGraph()
+plot(model2, which = 4) 
+
+#explore if excluding one outlier - 71 - would make a difference
+mydata2_cleaned <- mydata1_cleaned[-c(71),]
+model4 <- lm(pain ~ sex + age + pain_cat + STAI_trait + cortisol_serum + mindfulness, data = mydata2_cleaned)
+
+summary (model4)
+
+#Normality assumption - histogram, qq-plot, skewness and kurtosis
+
+openGraph()
+hist(residuals(model2), breaks = 20)
+openGraph()
+plot(model2, which = 2)
+describe(residuals(model2))
+
+
+#Linearity assumption
+
+openGraph()
+residualPlots(model2)
+
+#Homoscedasticty assumption - Breush-Pagan test and NCV test
+
+bptest(model2)
+ncvTest(model2)
+
+#No multicollinearity assumption
+
+vif(model2)
+
+
+# explore the reason for the violation
+
+openGraph()
+pairs.panels(mydata1_cleaned[, c("pain", "sex", "age", "STAI_trait", "pain_cat", "cortisol_serum", "cortisol_saliva","mindfulness")], col = "red", lm = T)
+
+#Excluding variable cortisol_saliva
+
+model3 <- lm(pain ~ sex + age + pain_cat + STAI_trait + cortisol_serum + mindfulness, data = mydata1_cleaned)
+
+vif(model3)
+
+summary(model2)
+summary (model3)
+
+##################################################
+# Rerun model diagnostics on new model:  model 3 
+##################################################
+
+#Checking for outliers - Cook's distance
+
+4/nrow(mydata_1) 
+openGraph()
+plot(model3, which = 4) 
+
+#Normality assumption - histogram, qq-plot, skewness and kurtosis
+
+openGraph()
+hist(residuals(model3), breaks = 20)
+openGraph()
+plot(model3, which = 2)
+describe(residuals(model3))
+
+
+#Linearity assumption
+
+openGraph()
+residualPlots(model3)
+
+#Homoscedasticty assumption - Breush-Pagan test and NCV test
+
+bptest(model3)
+ncvTest(model3)
+
+#No multicollinearity assumption
+
+vif(model3)
+
+###########################################
+#  Model selection
+###########################################
+
+#Results for the models
+
+
+summary (model1)
+summary(model3)
+
+
+#Anova
+anova(model1, model3)
+
+
+#AIC
+AIC(model1)
+AIC(model3)
+
+
+# confidence intervals and std. beta
+
+confint(model1)
+lm.beta(model3)
+
