@@ -1,0 +1,186 @@
+# clears workspace:
+graphics.off()
+rm(list = ls(all = TRUE))
+
+###########################
+# set the working directory
+##########################
+
+setwd("~/PSYP13 1")
+
+###########################
+#Load packages
+#########################
+
+library(lmtest)
+library(lsr)
+library(psych)
+library(car)
+library(ggplot2)
+library(lm.beta)
+
+source("GraphPlots.R")
+
+########################
+# load data file
+#######################
+mydata<- read.csv("https://raw.githubusercontent.com/kekecsz/PSYP13_Data_analysis_class-2018/master/home_sample_1.csv")
+
+#########################################
+# checking for irregularities in dataset
+#########################################
+
+View(mydata)
+
+describe(mydata$weight)
+
+hist(mydata$weight, breaks = 20)
+
+##############################################################################################################
+# cleaning dataset by correcting coding error in variable age, participant 28. Excluding participant 112, 148 
+##############################################################################################################
+mydata_cleaned = mydata
+
+mydata_cleaned[mydata_cleaned[, "age"] == 222, "age"] = 22
+
+
+mydata_cleaned <- mydata_cleaned[-c(112, 146), ]
+
+# Checking again to see how the changes affected the dataset
+
+describe(mydata_cleaned$age)
+openGraph()
+hist(mydata_cleaned$age, breaks = 10)
+
+describe(mydata_cleaned)
+
+View(mydata_cleaned)
+
+###################################################
+#creating models
+###################################################
+
+full_model = lm(pain ~ sex + age + weight + pain_cat + STAI_trait + cortisol_serum + mindfulness, data = mydata_cleaned)
+
+
+theory_based_model <- lm(pain ~ sex + age + pain_cat + STAI_trait + cortisol_serum + mindfulness, data = mydata_cleaned)
+
+summary(theory_based_model)
+summary(full_model)
+
+##################################################
+# Model diagnostics
+##################################################
+
+#Checking for outliers - Cook's distance
+
+4/nrow(mydata_cleaned) 
+openGraph()
+plot(full_model, which = 4) 
+
+
+#Normality assumption - histogram, qq-plot, skewness and kurtosis
+
+openGraph()
+hist(residuals(full_model), breaks = 20)
+openGraph()
+plot(full_model, which = 2)
+describe(residuals(full_model))
+
+
+#Linearity assumption
+
+openGraph()
+residualPlots(full_model)
+
+#Homoscedasticty assumption - Breush-Pagan test and NCV test
+
+bptest(full_model)
+ncvTest(full_model)
+
+#No multicollinearity assumption
+
+vif(full_model)
+
+###########################################
+#  Backward regression
+###########################################
+
+backward_model <- step(full_model, direction = "backward")
+              
+
+###########################################
+# Comparing models
+###########################################
+
+# results for the models
+
+summary(backward_model)
+
+summary(full_model)
+
+summary(theory_based_model)
+
+
+# testing out plots on most/least efficient predictors
+
+openGraph()
+plot(pain ~ cortisol_serum, data = mydata_cleaned) 
+abline(lm(pain ~ cortisol_serum, data = mydata_cleaned)) 
+openGraph()
+plot(pain ~ STAI_trait, data = mydata_cleaned) 
+abline(lm(pain ~ STAI_trait, data = mydata_cleaned))
+
+#AIC
+
+AIC(full_model)
+AIC(backward_model)
+AIC(theory_based_model)
+
+#ANOVA
+
+anova(full_model, backward_model)
+
+anova (theory_based_model, backward_model)
+
+# confidence intervals and std. beta
+
+confint(backward_model)
+lm.beta(backward_model)
+
+
+########################
+# load data file 2
+#######################
+test_data<- read.csv("https://raw.githubusercontent.com/kekecsz/PSYP13_Data_analysis_class-2018/master/home_sample_2.csv")
+
+View(test_data)
+
+##########################################################
+# checking for irregularities in dataset used for testing
+##########################################################
+
+describe(test_data)
+table(test_data$sex)
+
+###########################################
+# Testing performance on test dataset
+##########################################
+
+# Calculate predicted values of pain
+
+pred_theory <- predict(theory_based_model, test_data)
+
+pred_backward <- predict(backward_model, test_data)
+
+pred_theory
+pred_backward
+
+# Calculate the residual sum of squares
+
+RSS_theory = sum((test_data[,"pain"] - pred_theory)^2) 
+RSS_backward = sum((test_data[,"pain"] - pred_backward)^2) 
+
+RSS_theory
+
+RSS_backward
